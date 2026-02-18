@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: rootsecret
-      MYSQL_DATABASE: linktag_auth
+      MYSQL_DATABASE: linktag
       MYSQL_USER: linktag
       MYSQL_PASSWORD: secret
     ports:
@@ -42,7 +42,7 @@ services:
       APP_NAME: linktag-auth
       DB_HOST: mysql
       DB_PORT: "3306"
-      DB_NAME: linktag_auth
+      DB_NAME: linktag
       DB_USER: linktag
       DB_PASSWORD: secret
       DB_MAX_OPEN_CONNS: "25"
