@@ -9,6 +9,7 @@
 package router
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -52,6 +53,17 @@ func New(cfg Config) http.Handler {
 	// ── Rate limiters for sensitive endpoints ─────────────────────────────────
 	authLimiter := ratelimit.New(cfg.RateLimitRPS, cfg.RateLimitBurst)
 
+	// ── Hello World endpoint (rate-limited) ───────────────────────────────────
+	r.With(authLimiter.Middleware).Get("/hello", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": "Hello World"})
+	})
+
+	// ── Rate limiters for sensitive endpoints ─────────────────────────────────
+	r.With(authLimiter.Middleware).Get("/test", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": "Test"})
+	})
 	// ── Auth handlers ─────────────────────────────────────────────────────────
 	authHandler := handler.NewAuthHandler(cfg.AuthService)
 	adminHandler := handler.NewAdminHandler(cfg.UserService)
