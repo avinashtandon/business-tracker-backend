@@ -42,7 +42,7 @@ type DBConfig struct {
 	MaxOpenConns       int
 	MaxIdleConns       int
 	ConnMaxLifetimeMin int
-}
+} 
 
 // JWTConfig holds JWT signing keys and token parameters.
 type JWTConfig struct {
