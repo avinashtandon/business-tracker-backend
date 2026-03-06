@@ -84,10 +84,12 @@ func run(log *slog.Logger) error {
 	roleRepo := repository.NewRoleRepository(db.DB)
 	tokenRepo := repository.NewTokenRepository(db.DB)
 	loanRepo := repository.NewLoanRepository(db.DB)
+	cryptoRepo := repository.NewCryptoRepository(db.DB)
 
 	authSvc := service.NewAuthService(userRepo, roleRepo, tokenRepo, jwtMgr, cfg.JWT.AccessTokenTTL)
 	userSvc := service.NewUserService(userRepo)
 	loanSvc := service.NewLoanService(loanRepo)
+	cryptoSvc := service.NewCryptoService(cryptoRepo)
 
 	// ── Build router ──────────────────────────────────────────────────────────
 	httpRouter := router.New(router.Config{
@@ -96,6 +98,7 @@ func run(log *slog.Logger) error {
 		AuthService:    authSvc,
 		UserService:    userSvc,
 		LoanService:    loanSvc,
+		CryptoService:  cryptoSvc,
 		Logger:         log,
 		CORSOrigins:    cfg.CORS.AllowedOrigins,
 		RateLimitRPS:   cfg.RateLimit.RPS,

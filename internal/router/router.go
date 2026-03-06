@@ -31,6 +31,7 @@ type Config struct {
 	AuthService    service.AuthService
 	UserService    service.UserService
 	LoanService    service.LoanService
+	CryptoService  service.CryptoService
 	Logger         *slog.Logger
 	CORSOrigins    []string
 	RateLimitRPS   float64
@@ -69,6 +70,7 @@ func New(cfg Config) http.Handler {
 	authHandler := handler.NewAuthHandler(cfg.AuthService)
 	adminHandler := handler.NewAdminHandler(cfg.UserService)
 	loanHandler := handler.NewLoanHandler(cfg.LoanService)
+	cryptoHandler := handler.NewCryptoHandler(cfg.CryptoService)
 
 	// ── API v1 routes ─────────────────────────────────────────────────────────
 	r.Route("/api/v1", func(r chi.Router) {
@@ -111,6 +113,19 @@ func New(cfg Config) http.Handler {
 			// Transaction Routes
 			r.Post("/{loan_id}/transactions", loanHandler.CreateTransaction)
 			r.Delete("/{loan_id}/transactions/{transaction_id}", loanHandler.DeleteTransaction)
+		})
+
+		// Crypto routes — require auth
+		r.Route("/crypto", func(r chi.Router) {
+			r.Use(middleware.Authenticate(cfg.JWTManager))
+
+			r.Post("/", cryptoHandler.CreateHolding)
+			r.Get("/", cryptoHandler.ListHoldings)
+			r.Get("/prices", cryptoHandler.GetPrices)
+			r.Delete("/{id}", cryptoHandler.DeleteHolding)
+
+			r.Post("/{id}/purchases", cryptoHandler.CreatePurchase)
+			r.Delete("/{id}/purchases/{pid}", cryptoHandler.DeletePurchase)
 		})
 	})
 
