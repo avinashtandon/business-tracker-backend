@@ -105,6 +105,10 @@ func run(log *slog.Logger) error {
 		RateLimitBurst: cfg.RateLimit.Burst,
 	})
 
+	// ── Start Telegram Alerts Background Worker ───────────────────────────────
+	// Runs every 24 hours (and once right after boot).
+	service.StartOverdueNotifier(ctx, log, userRepo, loanRepo)
+
 	// ── Start HTTP server ─────────────────────────────────────────────────────
 	srv := &http.Server{
 		Addr:         ":" + cfg.App.Port,
