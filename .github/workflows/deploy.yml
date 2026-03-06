@@ -1,0 +1,35 @@
+name: Deploy to AWS Lightsail
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            # Check if directory exists, if not clone it
+            if [ ! -d "business-tracker-backend" ]; then
+              git clone https://github.com/avinashtandon/business-tracker-backend.git
+            fi
+            
+            # Navigate to directory
+            cd business-tracker-backend
+            
+            # Pull latest changes from main branch
+            git pull origin main
+            
+            # Build and restart docker containers securely
+            docker-compose up -d --build
