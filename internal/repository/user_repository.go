@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/avinashtandon/business-tracker-backend/internal/models"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	"github.com/linktag/auth-backend/internal/models"
 )
 
 // ErrNotFound is returned when a record is not found.
@@ -44,6 +44,9 @@ func NewUserRepository(db *sqlx.DB) UserRepository {
 type userRow struct {
 	ID           []byte            `db:"id"`
 	Email        string            `db:"email"`
+	Username     string            `db:"username"`
+	FirstName    string            `db:"first_name"`
+	LastName     string            `db:"last_name"`
 	PasswordHash string            `db:"password_hash"`
 	Status       models.UserStatus `db:"status"`
 	CreatedAt    time.Time         `db:"created_at"`
@@ -59,6 +62,9 @@ func (r userRow) toModel() (*models.User, error) {
 	return &models.User{
 		ID:           id,
 		Email:        r.Email,
+		Username:     r.Username,
+		FirstName:    r.FirstName,
+		LastName:     r.LastName,
 		PasswordHash: r.PasswordHash,
 		Status:       r.Status,
 		CreatedAt:    r.CreatedAt,
@@ -69,10 +75,13 @@ func (r userRow) toModel() (*models.User, error) {
 // Create inserts a new user record. Returns ErrDuplicateEmail on duplicate email.
 func (r *userRepo) Create(ctx context.Context, user *models.User) error {
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO users (id, email, password_hash, status, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO users (id, email, username, first_name, last_name, password_hash, status, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		user.ID[:],
 		user.Email,
+		user.Username,
+		user.FirstName,
+		user.LastName,
 		user.PasswordHash,
 		user.Status,
 		user.CreatedAt,
@@ -91,7 +100,7 @@ func (r *userRepo) Create(ctx context.Context, user *models.User) error {
 func (r *userRepo) FindByEmail(ctx context.Context, email string) (*models.User, error) {
 	var row userRow
 	err := r.db.GetContext(ctx, &row,
-		`SELECT id, email, password_hash, status, created_at, updated_at FROM users WHERE email = ?`, email)
+		`SELECT id, email, username, first_name, last_name, password_hash, status, created_at, updated_at FROM users WHERE email = ?`, email)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -105,7 +114,7 @@ func (r *userRepo) FindByEmail(ctx context.Context, email string) (*models.User,
 func (r *userRepo) FindByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	var row userRow
 	err := r.db.GetContext(ctx, &row,
-		`SELECT id, email, password_hash, status, created_at, updated_at FROM users WHERE id = ?`, id[:])
+		`SELECT id, email, username, first_name, last_name, password_hash, status, created_at, updated_at FROM users WHERE id = ?`, id[:])
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -132,7 +141,7 @@ func (r *userRepo) GetRoles(ctx context.Context, userID uuid.UUID) ([]string, er
 func (r *userRepo) ListAll(ctx context.Context) ([]*models.User, error) {
 	var rows []userRow
 	err := r.db.SelectContext(ctx, &rows,
-		`SELECT id, email, password_hash, status, created_at, updated_at FROM users ORDER BY created_at DESC`)
+		`SELECT id, email, username, first_name, last_name, password_hash, status, created_at, updated_at FROM users ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("listing users: %w", err)
 	}

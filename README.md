@@ -1,4 +1,4 @@
-# linktag-auth — Production-Ready Go Auth Backend
+# business-tracker-backend — Production-Ready Go Auth Backend
 
 A production-ready REST API implementing JWT authentication + RBAC with MySQL.
 

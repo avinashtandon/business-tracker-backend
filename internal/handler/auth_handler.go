@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/linktag/auth-backend/internal/middleware"
-	"github.com/linktag/auth-backend/internal/service"
-	"github.com/linktag/auth-backend/pkg/response"
-	"github.com/linktag/auth-backend/pkg/validator"
+	"github.com/avinashtandon/business-tracker-backend/internal/middleware"
+	"github.com/avinashtandon/business-tracker-backend/internal/service"
+	"github.com/avinashtandon/business-tracker-backend/pkg/response"
+	"github.com/avinashtandon/business-tracker-backend/pkg/validator"
 )
 
 // AuthHandler handles authentication-related HTTP requests.

@@ -78,7 +78,7 @@ func Load() (*Config, error) {
 	// App
 	cfg.App.Env = getEnv("APP_ENV", "development")
 	cfg.App.Port = getEnv("APP_PORT", "8080")
-	cfg.App.Name = getEnv("APP_NAME", "linktag-auth")
+	cfg.App.Name = getEnv("APP_NAME", "business-tracker-backend")
 
 	// DB
 	cfg.DB.Host = requireEnv("DB_HOST")

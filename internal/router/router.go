@@ -13,15 +13,15 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/avinashtandon/business-tracker-backend/internal/database"
+	"github.com/avinashtandon/business-tracker-backend/internal/handler"
+	"github.com/avinashtandon/business-tracker-backend/internal/middleware"
+	"github.com/avinashtandon/business-tracker-backend/internal/models"
+	"github.com/avinashtandon/business-tracker-backend/internal/service"
+	"github.com/avinashtandon/business-tracker-backend/pkg/jwtpkg"
+	"github.com/avinashtandon/business-tracker-backend/pkg/ratelimit"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/linktag/auth-backend/internal/database"
-	"github.com/linktag/auth-backend/internal/handler"
-	"github.com/linktag/auth-backend/internal/middleware"
-	"github.com/linktag/auth-backend/internal/models"
-	"github.com/linktag/auth-backend/internal/service"
-	"github.com/linktag/auth-backend/pkg/jwtpkg"
-	"github.com/linktag/auth-backend/pkg/ratelimit"
 )
 
 // Config holds all dependencies needed to build the router.
@@ -30,6 +30,7 @@ type Config struct {
 	JWTManager     *jwtpkg.Manager
 	AuthService    service.AuthService
 	UserService    service.UserService
+	LoanService    service.LoanService
 	Logger         *slog.Logger
 	CORSOrigins    []string
 	RateLimitRPS   float64
@@ -67,6 +68,7 @@ func New(cfg Config) http.Handler {
 	// ── Auth handlers ─────────────────────────────────────────────────────────
 	authHandler := handler.NewAuthHandler(cfg.AuthService)
 	adminHandler := handler.NewAdminHandler(cfg.UserService)
+	loanHandler := handler.NewLoanHandler(cfg.LoanService)
 
 	// ── API v1 routes ─────────────────────────────────────────────────────────
 	r.Route("/api/v1", func(r chi.Router) {
@@ -93,6 +95,22 @@ func New(cfg Config) http.Handler {
 			r.Use(middleware.Authenticate(cfg.JWTManager))
 			r.Use(middleware.RequireRole(models.RoleAdmin))
 			r.Get("/users", adminHandler.ListUsers)
+		})
+
+		// Loan & Transaction routes — require auth
+		r.Route("/loans", func(r chi.Router) {
+			r.Use(middleware.Authenticate(cfg.JWTManager))
+
+			// Loan CRU(D)
+			r.Post("/", loanHandler.Create)
+			r.Get("/", loanHandler.List)
+			r.Get("/{id}", loanHandler.Get)
+			r.Put("/{id}", loanHandler.Update)
+			r.Delete("/{id}", loanHandler.Delete)
+
+			// Transaction Routes
+			r.Post("/{loan_id}/transactions", loanHandler.CreateTransaction)
+			r.Delete("/{loan_id}/transactions/{transaction_id}", loanHandler.DeleteTransaction)
 		})
 	})
 

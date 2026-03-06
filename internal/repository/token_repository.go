@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	"github.com/linktag/auth-backend/internal/models"
+	"github.com/avinashtandon/business-tracker-backend/internal/models"
 )
 
 // TokenRepository defines the data access interface for refresh tokens.

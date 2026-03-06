@@ -3,8 +3,8 @@ package handler
 import (
 	"net/http"
 
-	"github.com/linktag/auth-backend/internal/database"
-	"github.com/linktag/auth-backend/pkg/response"
+	"github.com/avinashtandon/business-tracker-backend/internal/database"
+	"github.com/avinashtandon/business-tracker-backend/pkg/response"
 )
 
 // HealthHandler handles health and readiness check endpoints.

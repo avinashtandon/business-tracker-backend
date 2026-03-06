@@ -21,16 +21,16 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/avinashtandon/business-tracker-backend/config"
+	"github.com/avinashtandon/business-tracker-backend/internal/database"
+	"github.com/avinashtandon/business-tracker-backend/internal/repository"
+	"github.com/avinashtandon/business-tracker-backend/internal/router"
+	"github.com/avinashtandon/business-tracker-backend/internal/service"
+	"github.com/avinashtandon/business-tracker-backend/pkg/jwtpkg"
+	"github.com/avinashtandon/business-tracker-backend/pkg/logger"
 	"github.com/golang-migrate/migrate/v4"
 	mysqlmigrate "github.com/golang-migrate/migrate/v4/database/mysql"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/linktag/auth-backend/config"
-	"github.com/linktag/auth-backend/internal/database"
-	"github.com/linktag/auth-backend/internal/repository"
-	"github.com/linktag/auth-backend/internal/router"
-	"github.com/linktag/auth-backend/internal/service"
-	"github.com/linktag/auth-backend/pkg/jwtpkg"
-	"github.com/linktag/auth-backend/pkg/logger"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mysql"
 )
@@ -50,8 +50,8 @@ func setupTestServer(t *testing.T) *testServer {
 	// ── Start MySQL container ─────────────────────────────────────────────────
 	mysqlContainer, err := mysql.Run(ctx,
 		"mysql:8.0",
-		mysql.WithDatabase("linktag_auth"),
-		mysql.WithUsername("linktag"),
+		mysql.WithDatabase("business_tracker"),
+		mysql.WithUsername("business_tracker"),
 		mysql.WithPassword("secret"),
 		testcontainers.WithWaitStrategy(
 			// Wait until MySQL is ready to accept connections.
@@ -200,8 +200,11 @@ func TestRegisterLoginRefreshLogout(t *testing.T) {
 	// ── 1. Register ───────────────────────────────────────────────────────────
 	t.Run("register", func(t *testing.T) {
 		resp := ts.post(t, "/api/v1/auth/register", map[string]string{
-			"email":    email,
-			"password": password,
+			"email":      email,
+			"username":   "testuser",
+			"first_name": "John",
+			"last_name":  "Doe",
+			"password":   password,
 		}, "")
 
 		if resp.StatusCode != http.StatusCreated {
@@ -216,8 +219,11 @@ func TestRegisterLoginRefreshLogout(t *testing.T) {
 	// ── 2. Register duplicate email → 409 ────────────────────────────────────
 	t.Run("register_duplicate_email", func(t *testing.T) {
 		resp := ts.post(t, "/api/v1/auth/register", map[string]string{
-			"email":    email,
-			"password": password,
+			"email":      email,
+			"username":   "testuser",
+			"first_name": "John",
+			"last_name":  "Doe",
+			"password":   password,
 		}, "")
 		if resp.StatusCode != http.StatusConflict {
 			t.Errorf("expected 409 for duplicate email, got %d", resp.StatusCode)
@@ -373,8 +379,11 @@ func TestAdminEndpoint_RequiresAdminRole(t *testing.T) {
 
 	// Register a regular user.
 	ts.post(t, "/api/v1/auth/register", map[string]string{
-		"email":    email,
-		"password": "SecurePass123!",
+		"email":      email,
+		"username":   "testuser",
+		"first_name": "John",
+		"last_name":  "Doe",
+		"password":   "SecurePass123!",
 	}, "").Body.Close()
 
 	// Login.

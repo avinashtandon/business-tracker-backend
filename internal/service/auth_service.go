@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/avinashtandon/business-tracker-backend/internal/models"
+	"github.com/avinashtandon/business-tracker-backend/internal/repository"
+	"github.com/avinashtandon/business-tracker-backend/pkg/jwtpkg"
+	"github.com/avinashtandon/business-tracker-backend/pkg/password"
 	"github.com/google/uuid"
-	"github.com/linktag/auth-backend/internal/models"
-	"github.com/linktag/auth-backend/internal/repository"
-	"github.com/linktag/auth-backend/pkg/jwtpkg"
-	"github.com/linktag/auth-backend/pkg/password"
 )
 
 // Sentinel errors for the auth service.
@@ -26,17 +26,21 @@ var (
 
 // AuthTokens is the response payload for login and refresh operations.
 type AuthTokens struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token"`
-	TokenType    string    `json:"token_type"`
-	ExpiresIn    int       `json:"expires_in"` // seconds
-	ExpiresAt    time.Time `json:"expires_at"`
+	AccessToken  string             `json:"access_token"`
+	RefreshToken string             `json:"refresh_token"`
+	TokenType    string             `json:"token_type"`
+	ExpiresIn    int                `json:"expires_in"` // seconds
+	ExpiresAt    time.Time          `json:"expires_at"`
+	User         *models.PublicUser `json:"user,omitempty"`
 }
 
 // RegisterInput is the validated input for user registration.
 type RegisterInput struct {
-	Email    string `json:"email"    validate:"required,email,max=255"`
-	Password string `json:"password" validate:"required,min=8,max=128"`
+	Email     string `json:"email"      validate:"required,email,max=255"`
+	Username  string `json:"username"   validate:"required,min=3,max=50"`
+	FirstName string `json:"first_name" validate:"required,max=100"`
+	LastName  string `json:"last_name"  validate:"required,max=100"`
+	Password  string `json:"password"   validate:"required,min=8,max=128"`
 }
 
 // LoginInput is the validated input for user login.
@@ -90,6 +94,9 @@ func (s *authService) Register(ctx context.Context, input RegisterInput) (*model
 	user := &models.User{
 		ID:           uuid.New(),
 		Email:        input.Email,
+		Username:     input.Username,
+		FirstName:    input.FirstName,
+		LastName:     input.LastName,
 		PasswordHash: hash,
 		Status:       models.UserStatusActive,
 		CreatedAt:    now,
@@ -141,7 +148,9 @@ func (s *authService) Login(ctx context.Context, input LoginInput, ip, userAgent
 		return nil, fmt.Errorf("getting roles: %w", err)
 	}
 
-	return s.issueTokenPair(ctx, user.ID.String(), roles, ip, userAgent)
+	user.Roles = roles
+
+	return s.issueTokenPair(ctx, user.ID.String(), roles, ip, userAgent, user.ToPublic())
 }
 
 // RefreshTokens validates the refresh token, rotates it, and issues a new pair.
@@ -189,8 +198,13 @@ func (s *authService) RefreshTokens(ctx context.Context, rawRefreshToken, ip, us
 		return nil, fmt.Errorf("getting roles: %w", err)
 	}
 
-	// 7. Issue new token pair.
-	tokens, err := s.issueTokenPair(ctx, claims.Subject, roles, ip, userAgent)
+	// 7. Get user profile and Issue new token pair.
+	userProfile, err := s.GetMe(ctx, claims.Subject)
+	if err != nil {
+		return nil, fmt.Errorf("getting user profile: %w", err)
+	}
+
+	tokens, err := s.issueTokenPair(ctx, claims.Subject, roles, ip, userAgent, userProfile)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +268,7 @@ func (s *authService) GetMe(ctx context.Context, userID string) (*models.PublicU
 }
 
 // issueTokenPair creates and stores a new access + refresh token pair.
-func (s *authService) issueTokenPair(ctx context.Context, userID string, roles []string, ip, userAgent string) (*AuthTokens, error) {
+func (s *authService) issueTokenPair(ctx context.Context, userID string, roles []string, ip, userAgent string, userProfile *models.PublicUser) (*AuthTokens, error) {
 	accessToken, _, err := s.jwtMgr.IssueAccessToken(userID, roles)
 	if err != nil {
 		return nil, fmt.Errorf("issuing access token: %w", err)
@@ -291,6 +305,7 @@ func (s *authService) issueTokenPair(ctx context.Context, userID string, roles [
 		TokenType:    "Bearer",
 		ExpiresIn:    int(s.accessTTL.Seconds()),
 		ExpiresAt:    expiresAt,
+		User:         userProfile,
 	}, nil
 }
 

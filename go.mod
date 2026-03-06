@@ -1,4 +1,4 @@
-module github.com/linktag/auth-backend
+module github.com/avinashtandon/business-tracker-backend
 
 go 1.24.0
 

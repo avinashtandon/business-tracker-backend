@@ -1,0 +1,1 @@
+ALTER TABLE loans ADD COLUMN payment_mode VARCHAR(50) DEFAULT 'Cash';

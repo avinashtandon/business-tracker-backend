@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/linktag/auth-backend/internal/middleware"
-	"github.com/linktag/auth-backend/pkg/jwtpkg"
+	"github.com/avinashtandon/business-tracker-backend/internal/middleware"
+	"github.com/avinashtandon/business-tracker-backend/pkg/jwtpkg"
 )
 
 func generateTestKeys(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {

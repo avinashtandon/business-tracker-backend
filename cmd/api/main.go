@@ -16,16 +16,16 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/avinashtandon/business-tracker-backend/config"
+	"github.com/avinashtandon/business-tracker-backend/internal/database"
+	"github.com/avinashtandon/business-tracker-backend/internal/repository"
+	"github.com/avinashtandon/business-tracker-backend/internal/router"
+	"github.com/avinashtandon/business-tracker-backend/internal/service"
+	"github.com/avinashtandon/business-tracker-backend/pkg/jwtpkg"
+	"github.com/avinashtandon/business-tracker-backend/pkg/logger"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/mysql"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/linktag/auth-backend/config"
-	"github.com/linktag/auth-backend/internal/database"
-	"github.com/linktag/auth-backend/internal/repository"
-	"github.com/linktag/auth-backend/internal/router"
-	"github.com/linktag/auth-backend/internal/service"
-	"github.com/linktag/auth-backend/pkg/jwtpkg"
-	"github.com/linktag/auth-backend/pkg/logger"
 )
 
 func main() {
@@ -83,9 +83,11 @@ func run(log *slog.Logger) error {
 	userRepo := repository.NewUserRepository(db.DB)
 	roleRepo := repository.NewRoleRepository(db.DB)
 	tokenRepo := repository.NewTokenRepository(db.DB)
+	loanRepo := repository.NewLoanRepository(db.DB)
 
 	authSvc := service.NewAuthService(userRepo, roleRepo, tokenRepo, jwtMgr, cfg.JWT.AccessTokenTTL)
 	userSvc := service.NewUserService(userRepo)
+	loanSvc := service.NewLoanService(loanRepo)
 
 	// ── Build router ──────────────────────────────────────────────────────────
 	httpRouter := router.New(router.Config{
@@ -93,6 +95,7 @@ func run(log *slog.Logger) error {
 		JWTManager:     jwtMgr,
 		AuthService:    authSvc,
 		UserService:    userSvc,
+		LoanService:    loanSvc,
 		Logger:         log,
 		CORSOrigins:    cfg.CORS.AllowedOrigins,
 		RateLimitRPS:   cfg.RateLimit.RPS,

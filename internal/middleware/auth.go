@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/linktag/auth-backend/pkg/jwtpkg"
-	"github.com/linktag/auth-backend/pkg/response"
+	"github.com/avinashtandon/business-tracker-backend/pkg/jwtpkg"
+	"github.com/avinashtandon/business-tracker-backend/pkg/response"
 )
 
 type contextKey string

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pkglogger "github.com/linktag/auth-backend/pkg/logger"
+	pkglogger "github.com/avinashtandon/business-tracker-backend/pkg/logger"
 )
 
 const requestIDHeader = "X-Request-ID"

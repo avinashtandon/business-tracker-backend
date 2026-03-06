@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/linktag/auth-backend/pkg/jwtpkg"
+	"github.com/avinashtandon/business-tracker-backend/pkg/jwtpkg"
 )
 
 // generateTestKeys creates a fresh RSA-2048 key pair for testing.

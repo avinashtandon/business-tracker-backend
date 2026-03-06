@@ -3,7 +3,7 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/linktag/auth-backend/pkg/response"
+	"github.com/avinashtandon/business-tracker-backend/pkg/response"
 )
 
 // RequireRole returns a middleware that checks the authenticated user has

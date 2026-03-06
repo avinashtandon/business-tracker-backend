@@ -1,0 +1,18 @@
+# Environment variables (contains secrets — never commit!)
+.env
+
+# RSA keys
+private.pem
+public.pem
+
+# Go build artifacts
+/tmp/
+*.out
+*.test
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

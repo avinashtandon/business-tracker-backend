@@ -3,8 +3,8 @@ package handler
 import (
 	"net/http"
 
-	"github.com/linktag/auth-backend/internal/service"
-	"github.com/linktag/auth-backend/pkg/response"
+	"github.com/avinashtandon/business-tracker-backend/internal/service"
+	"github.com/avinashtandon/business-tracker-backend/pkg/response"
 )
 
 // AdminHandler handles admin-only HTTP requests.

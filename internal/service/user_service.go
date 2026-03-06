@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/linktag/auth-backend/internal/models"
-	"github.com/linktag/auth-backend/internal/repository"
+	"github.com/avinashtandon/business-tracker-backend/internal/models"
+	"github.com/avinashtandon/business-tracker-backend/internal/repository"
 )
 
 // UserService defines the business logic for user management (admin operations).
