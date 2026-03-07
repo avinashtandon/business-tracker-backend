@@ -6,16 +6,16 @@ services:
     container_name: business-tracker-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: rootsecret
-      MYSQL_DATABASE: business_tracker
-      MYSQL_USER: business_tracker
-      MYSQL_PASSWORD: secret
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "business_tracker", "-psecret"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -50,9 +50,9 @@ services:
       APP_NAME: business-tracker-backend
       DB_HOST: mysql
       DB_PORT: "3306"
-      DB_NAME: business_tracker
-      DB_USER: business_tracker
-      DB_PASSWORD: secret
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
       DB_MAX_OPEN_CONNS: "25"
       DB_MAX_IDLE_CONNS: "10"
       DB_CONN_MAX_LIFETIME_MINUTES: "5"
