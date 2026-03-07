@@ -31,5 +31,9 @@ jobs:
             # Pull latest changes from main branch
             git pull origin main
             
+            # Create .env file with secrets for Telegram
+            echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" > .env
+            echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}" >> .env
+            
             # Build and restart docker containers securely
             docker-compose up -d --build
