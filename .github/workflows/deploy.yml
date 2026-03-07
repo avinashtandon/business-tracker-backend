@@ -31,11 +31,13 @@ jobs:
             # Pull latest changes from main branch
             git pull origin main
             
-            # Create .env file with all production secrets (Telegram + JWT)
+            # Create .env file with Telegram secrets
             echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" > .env
             echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}" >> .env
-            echo "JWT_PRIVATE_KEY_B64=${{ secrets.JWT_PRIVATE_KEY_B64 }}" >> .env
-            echo "JWT_PUBLIC_KEY_B64=${{ secrets.JWT_PUBLIC_KEY_B64 }}" >> .env
+            
+            # Generate JWT keys from existing .pem files on server (avoids multiline base64 issues)
+            echo "JWT_PRIVATE_KEY_B64=$(base64 -w 0 private.pem)" >> .env
+            echo "JWT_PUBLIC_KEY_B64=$(base64 -w 0 public.pem)" >> .env
             
             # Build and restart docker containers securely
             docker-compose down
