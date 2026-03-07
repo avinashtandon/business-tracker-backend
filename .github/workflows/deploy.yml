@@ -38,4 +38,5 @@ jobs:
             echo "JWT_PUBLIC_KEY_B64=${{ secrets.JWT_PUBLIC_KEY_B64 }}" >> .env
             
             # Build and restart docker containers securely
+            docker-compose down
             docker-compose up -d --build
