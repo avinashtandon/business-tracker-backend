@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/avinashtandon/business-tracker-backend/internal/repository"
@@ -102,7 +103,11 @@ func checkAndSendOverdueAlerts(ctx context.Context, logger *slog.Logger, userRep
 			// Calculate remaining amount
 			var totalPaid float64
 			for _, t := range loan.Transactions {
-				if t.Mode == "Received" {
+				// The UI tracks both initial lending and payments in Transactions.
+				// User marks the initial lending transaction with notes like "Initial Amount Given".
+				// We skip these to accurately count only the repayments!
+				noteLower := strings.ToLower(t.Note)
+				if !strings.Contains(noteLower, "given") && !strings.Contains(noteLower, "initial") {
 					totalPaid += t.Amount
 				}
 			}
