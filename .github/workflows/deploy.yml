@@ -8,7 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -20,25 +20,23 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            # Check if directory exists, if not clone it
+            set -e
+
             if [ ! -d "business-tracker-backend" ]; then
               git clone https://github.com/avinashtandon/business-tracker-backend.git
             fi
-            
-            # Navigate to directory
+
             cd business-tracker-backend
-            
-            # Pull latest changes from main branch
+
             git pull origin main
-            
-            # Create .env file with Telegram secrets
-            echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" > .env
-            echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}" >> .env
-            
-            # Generate JWT keys from existing .pem files on server (avoids multiline base64 issues)
-            echo "JWT_PRIVATE_KEY_B64=$(base64 -w 0 private.pem)" >> .env
-            echo "JWT_PUBLIC_KEY_B64=$(base64 -w 0 public.pem)" >> .env
-            
-            # Build and restart docker containers securely
-            docker-compose down
-            docker-compose up -d --build
+
+            if [ ! -f ".env" ]; then
+              echo ".env file missing! Aborting deploy."
+              exit 1
+            fi
+
+            docker-compose up -d --build --remove-orphans
+
+            docker image prune -f
+
+            echo "Deployment completed successfully."
