@@ -102,7 +102,9 @@ func checkAndSendOverdueAlerts(ctx context.Context, logger *slog.Logger, userRep
 			// Calculate remaining amount
 			var totalPaid float64
 			for _, t := range loan.Transactions {
-				totalPaid += t.Amount
+				if t.Mode == "Received" {
+					totalPaid += t.Amount
+				}
 			}
 			totalReturn := loan.PrincipalAmount + loan.InterestAmount
 			remaining := totalReturn - totalPaid
