@@ -174,6 +174,10 @@ func (s *authService) RefreshTokens(ctx context.Context, rawRefreshToken, ip, us
 
 	// 3. Check revocation — if already revoked, this may be a replay attack.
 	if record.IsRevoked() {
+		// Replay attack detected: revoke all user sessions to secure the account.
+		if revokeErr := s.tokenRepo.RevokeAllForUser(ctx, record.UserID); revokeErr != nil {
+			return nil, fmt.Errorf("revoking all tokens on replay attack: %w", revokeErr)
+		}
 		return nil, ErrTokenRevoked
 	}
 

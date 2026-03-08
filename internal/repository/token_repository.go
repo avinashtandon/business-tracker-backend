@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/avinashtandon/business-tracker-backend/internal/models"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	"github.com/avinashtandon/business-tracker-backend/internal/models"
 )
 
 // TokenRepository defines the data access interface for refresh tokens.
@@ -18,6 +18,7 @@ type TokenRepository interface {
 	Create(ctx context.Context, token *models.RefreshToken) error
 	FindByJTI(ctx context.Context, jti string) (*models.RefreshToken, error)
 	Revoke(ctx context.Context, jti string, replacedByJTI *string) error
+	RevokeAllForUser(ctx context.Context, userID uuid.UUID) error
 	DeleteExpired(ctx context.Context) error
 }
 
@@ -110,10 +111,24 @@ func (r *tokenRepo) Revoke(ctx context.Context, jti string, replacedByJTI *strin
 	return nil
 }
 
-// DeleteExpired removes all expired refresh tokens to keep the table clean.
-func (r *tokenRepo) DeleteExpired(ctx context.Context) error {
+// RevokeAllForUser marks all refresh tokens for a user as revoked (used in replay attack remediation).
+func (r *tokenRepo) RevokeAllForUser(ctx context.Context, userID uuid.UUID) error {
 	_, err := r.db.ExecContext(ctx,
-		`DELETE FROM refresh_tokens WHERE expires_at < ?`, time.Now())
+		`UPDATE refresh_tokens SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL`,
+		time.Now(), userID[:])
+	if err != nil {
+		return fmt.Errorf("revoking all refresh tokens for user %s: %w", userID, err)
+	}
+	return nil
+}
+
+// DeleteExpired removes expired or old revoked refresh tokens to keep the table clean.
+// Tokens are retained for 7 days after expiry or revocation to allow replay detection.
+func (r *tokenRepo) DeleteExpired(ctx context.Context) error {
+	cutoff := time.Now().Add(-7 * 24 * time.Hour)
+	_, err := r.db.ExecContext(ctx,
+		`DELETE FROM refresh_tokens WHERE expires_at < ? OR (revoked_at IS NOT NULL AND revoked_at < ?)`,
+		cutoff, cutoff)
 	if err != nil {
 		return fmt.Errorf("deleting expired refresh tokens: %w", err)
 	}
