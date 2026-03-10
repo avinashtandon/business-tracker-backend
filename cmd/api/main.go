@@ -83,10 +83,11 @@ func run(log *slog.Logger) error {
 	userRepo := repository.NewUserRepository(db.DB)
 	roleRepo := repository.NewRoleRepository(db.DB)
 	tokenRepo := repository.NewTokenRepository(db.DB)
+	passwordResetRepo := repository.NewPasswordResetRepository(db.DB)
 	loanRepo := repository.NewLoanRepository(db.DB)
 	cryptoRepo := repository.NewCryptoRepository(db.DB)
 
-	authSvc := service.NewAuthService(userRepo, roleRepo, tokenRepo, jwtMgr, cfg.JWT.AccessTokenTTL)
+	authSvc := service.NewAuthService(userRepo, roleRepo, tokenRepo, passwordResetRepo, jwtMgr, cfg.JWT.AccessTokenTTL)
 	userSvc := service.NewUserService(userRepo)
 	loanSvc := service.NewLoanService(loanRepo)
 	cryptoSvc := service.NewCryptoService(cryptoRepo)

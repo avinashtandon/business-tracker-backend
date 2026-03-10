@@ -3,6 +3,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -175,4 +176,58 @@ func clientIP(r *http.Request) string {
 		return xri
 	}
 	return r.RemoteAddr
+}
+
+// ForgotPassword handles POST /api/v1/auth/forgot-password
+// Always returns a generic success message to prevent email enumeration.
+func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Email string `json:"email" validate:"required,email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.ValidationError(w, "invalid JSON body")
+		return
+	}
+	if err := validator.Validate(body); err != nil {
+		response.ValidationError(w, err.Error())
+		return
+	}
+
+	ip := clientIP(r)
+
+	// Fire and forget (silent success if email not found or error happens)
+	// Alternatively, handle errors strictly internally.
+	if err := h.authSvc.ForgotPassword(r.Context(), body.Email, ip); err != nil {
+		slog.Error("failed to process forgot password request", "email", body.Email, "error", err)
+	}
+
+	response.Success(w, http.StatusOK, map[string]string{
+		"message": "If the email exists, a reset link has been sent.",
+	})
+}
+
+// ResetPassword handles POST /api/v1/auth/reset-password
+func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Token       string `json:"token" validate:"required"`
+		NewPassword string `json:"new_password" validate:"required,min=8,max=128"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.ValidationError(w, "invalid JSON body")
+		return
+	}
+	if err := validator.Validate(body); err != nil {
+		response.ValidationError(w, err.Error())
+		return
+	}
+
+	err := h.authSvc.ResetPassword(r.Context(), body.Token, body.NewPassword)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "INVALID_TOKEN", "invalid, expired, or previously used reset token")
+		return
+	}
+
+	response.Success(w, http.StatusOK, map[string]string{
+		"message": "password has been successfully reset",
+	})
 }

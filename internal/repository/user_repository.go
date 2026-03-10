@@ -27,6 +27,7 @@ type UserRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*models.User, error)
 	GetRoles(ctx context.Context, userID uuid.UUID) ([]string, error)
 	ListAll(ctx context.Context) ([]*models.User, error)
+	UpdatePassword(ctx context.Context, userID uuid.UUID, newPasswordHash string) error
 }
 
 // userRepo is the sqlx-backed implementation of UserRepository.
@@ -155,6 +156,22 @@ func (r *userRepo) ListAll(ctx context.Context) ([]*models.User, error) {
 		users = append(users, u)
 	}
 	return users, nil
+}
+
+// UpdatePassword sets a new password hash for the user.
+func (r *userRepo) UpdatePassword(ctx context.Context, userID uuid.UUID, newPasswordHash string) error {
+	res, err := r.db.ExecContext(ctx,
+		`UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`,
+		newPasswordHash, time.Now(), userID[:])
+	if err != nil {
+		return fmt.Errorf("updating user password: %w", err)
+	}
+
+	rowsAffected, _ := res.RowsAffected()
+	if rowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // isDuplicateKeyError checks if the error is a MySQL duplicate key violation.

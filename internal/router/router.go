@@ -81,6 +81,8 @@ func New(cfg Config) http.Handler {
 			r.With(authLimiter.Middleware).Post("/register", authHandler.Register)
 			r.With(authLimiter.Middleware).Post("/login", authHandler.Login)
 			r.With(authLimiter.Middleware).Post("/refresh", authHandler.Refresh)
+			r.With(authLimiter.Middleware).Post("/forgot-password", authHandler.ForgotPassword)
+			r.With(authLimiter.Middleware).Post("/reset-password", authHandler.ResetPassword)
 
 			// Logout: requires valid refresh token in body (no access token needed)
 			r.Post("/logout", authHandler.Logout)

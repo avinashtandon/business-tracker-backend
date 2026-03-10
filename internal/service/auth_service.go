@@ -3,9 +3,12 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/avinashtandon/business-tracker-backend/internal/models"
@@ -56,14 +59,17 @@ type AuthService interface {
 	RefreshTokens(ctx context.Context, rawRefreshToken, ip, userAgent string) (*AuthTokens, error)
 	Logout(ctx context.Context, rawRefreshToken string) error
 	GetMe(ctx context.Context, userID string) (*models.PublicUser, error)
+	ForgotPassword(ctx context.Context, email, clientIP string) error
+	ResetPassword(ctx context.Context, rawToken, newPassword string) error
 }
 
 type authService struct {
-	userRepo  repository.UserRepository
-	roleRepo  repository.RoleRepository
-	tokenRepo repository.TokenRepository
-	jwtMgr    *jwtpkg.Manager
-	accessTTL time.Duration
+	userRepo          repository.UserRepository
+	roleRepo          repository.RoleRepository
+	tokenRepo         repository.TokenRepository
+	passwordResetRepo repository.PasswordResetRepository
+	jwtMgr            *jwtpkg.Manager
+	accessTTL         time.Duration
 }
 
 // NewAuthService creates a new AuthService.
@@ -71,15 +77,17 @@ func NewAuthService(
 	userRepo repository.UserRepository,
 	roleRepo repository.RoleRepository,
 	tokenRepo repository.TokenRepository,
+	passwordResetRepo repository.PasswordResetRepository,
 	jwtMgr *jwtpkg.Manager,
 	accessTTL time.Duration,
 ) AuthService {
 	return &authService{
-		userRepo:  userRepo,
-		roleRepo:  roleRepo,
-		tokenRepo: tokenRepo,
-		jwtMgr:    jwtMgr,
-		accessTTL: accessTTL,
+		userRepo:          userRepo,
+		roleRepo:          roleRepo,
+		tokenRepo:         tokenRepo,
+		passwordResetRepo: passwordResetRepo,
+		jwtMgr:            jwtMgr,
+		accessTTL:         accessTTL,
 	}
 }
 
@@ -326,4 +334,94 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return s[:max]
+}
+
+// Generate secure token and send email
+func (s *authService) ForgotPassword(ctx context.Context, email, clientIP string) error {
+	user, err := s.userRepo.FindByEmail(ctx, email)
+	if err != nil {
+		// Silent success (anti-enumeration)
+		return nil
+	}
+
+	// Delete old tokens first to enforce single-active-token
+	if err := s.passwordResetRepo.DeleteByUser(ctx, user.ID); err != nil {
+		return fmt.Errorf("deleting old reset tokens: %w", err)
+	}
+
+	rawToken, err := generateRandomToken(32) // Use a proper crypto-random generator
+	if err != nil {
+		return fmt.Errorf("generating reset token: %w", err)
+	}
+
+	tokenHash := repository.HashToken(rawToken) // Reuse the HashToken logic from refresh tokens
+	ipPtr := &clientIP
+	if clientIP == "" {
+		ipPtr = nil
+	}
+
+	prt := &models.PasswordResetToken{
+		ID:        uuid.New(),
+		UserID:    user.ID,
+		TokenHash: tokenHash,
+		ExpiresAt: time.Now().Add(15 * time.Minute),
+		IPAddress: ipPtr,
+		CreatedAt: time.Now(),
+	}
+
+	if err := s.passwordResetRepo.Create(ctx, prt); err != nil {
+		return fmt.Errorf("storing reset token: %w", err)
+	}
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000"
+	}
+	resetURL := fmt.Sprintf("%s/reset-password?token=%s", frontendURL, rawToken)
+
+	if err := SendResetEmail(user.Email, resetURL); err != nil {
+		return fmt.Errorf("sending reset email: %w", err)
+	}
+
+	return nil
+}
+
+// ResetPassword consumes a token and validates it.
+func (s *authService) ResetPassword(ctx context.Context, rawToken, newPassword string) error {
+	tokenHash := repository.HashToken(rawToken)
+
+	prt, err := s.passwordResetRepo.FindByTokenHash(ctx, tokenHash)
+	if err != nil {
+		return errors.New("invalid or expired token")
+	}
+
+	if prt.IsUsed() || prt.IsExpired() {
+		return errors.New("invalid or expired token")
+	}
+
+	newHash, err := password.Hash(newPassword)
+	if err != nil {
+		return fmt.Errorf("hashing password: %w", err)
+	}
+
+	if err := s.userRepo.UpdatePassword(ctx, prt.UserID, newHash); err != nil {
+		return fmt.Errorf("updating user password: %w", err)
+	}
+
+	if err := s.passwordResetRepo.MarkAsUsed(ctx, prt.ID); err != nil {
+		return fmt.Errorf("marking token used: %w", err)
+	}
+
+	// For ultimate security, we could optionally call RevokeAllForUser to drop existing sessions
+	// s.tokenRepo.RevokeAllForUser(ctx, prt.UserID)
+
+	return nil
+}
+
+// generateRandomToken generates a cryptographically secure hex string of the given byte length
+func generateRandomToken(length int) (string, error) {
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
 }

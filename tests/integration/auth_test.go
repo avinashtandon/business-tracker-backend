@@ -114,8 +114,8 @@ func setupTestServer(t *testing.T) *testServer {
 	userRepo := repository.NewUserRepository(db.DB)
 	roleRepo := repository.NewRoleRepository(db.DB)
 	tokenRepo := repository.NewTokenRepository(db.DB)
-
-	authSvc := service.NewAuthService(userRepo, roleRepo, tokenRepo, jwtMgr, 15*time.Minute)
+	passwordResetRepo := repository.NewPasswordResetRepository(db.DB)
+	authSvc := service.NewAuthService(userRepo, roleRepo, tokenRepo, passwordResetRepo, jwtMgr, 15*time.Minute)
 	userSvc := service.NewUserService(userRepo)
 
 	log := logger.New(slog.LevelError) // Suppress logs during tests.
