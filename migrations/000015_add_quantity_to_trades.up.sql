@@ -1,0 +1,1 @@
+ALTER TABLE trades ADD COLUMN quantity DECIMAL(20,8) NOT NULL AFTER position;
