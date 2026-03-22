@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/avinashtandon/business-tracker-backend/internal/dto"
 	"github.com/avinashtandon/business-tracker-backend/internal/models"
 	"github.com/avinashtandon/business-tracker-backend/internal/repository"
 	"github.com/avinashtandon/business-tracker-backend/pkg/jwtpkg"
@@ -27,38 +28,13 @@ var (
 	ErrEmailTaken         = errors.New("email address is already registered")
 )
 
-// AuthTokens is the response payload for login and refresh operations.
-type AuthTokens struct {
-	AccessToken  string             `json:"access_token"`
-	RefreshToken string             `json:"refresh_token"`
-	TokenType    string             `json:"token_type"`
-	ExpiresIn    int                `json:"expires_in"` // seconds
-	ExpiresAt    time.Time          `json:"expires_at"`
-	User         *models.PublicUser `json:"user,omitempty"`
-}
-
-// RegisterInput is the validated input for user registration.
-type RegisterInput struct {
-	Email     string `json:"email"      validate:"required,email,max=255"`
-	Username  string `json:"username"   validate:"required,min=3,max=50"`
-	FirstName string `json:"first_name" validate:"required,max=100"`
-	LastName  string `json:"last_name"  validate:"required,max=100"`
-	Password  string `json:"password"   validate:"required,min=8,max=128"`
-}
-
-// LoginInput is the validated input for user login.
-type LoginInput struct {
-	Email    string `json:"email"    validate:"required,email"`
-	Password string `json:"password" validate:"required"`
-}
-
 // AuthService defines the authentication business logic interface.
 type AuthService interface {
-	Register(ctx context.Context, input RegisterInput) (*models.PublicUser, error)
-	Login(ctx context.Context, input LoginInput, ip, userAgent string) (*AuthTokens, error)
-	RefreshTokens(ctx context.Context, rawRefreshToken, ip, userAgent string) (*AuthTokens, error)
+	Register(ctx context.Context, input dto.RegisterRequest) (*dto.UserResponse, error)
+	Login(ctx context.Context, input dto.LoginRequest, ip, userAgent string) (*dto.AuthTokensResponse, error)
+	RefreshTokens(ctx context.Context, rawRefreshToken, ip, userAgent string) (*dto.AuthTokensResponse, error)
 	Logout(ctx context.Context, rawRefreshToken string) error
-	GetMe(ctx context.Context, userID string) (*models.PublicUser, error)
+	GetMe(ctx context.Context, userID string) (*dto.UserResponse, error)
 	ForgotPassword(ctx context.Context, email, clientIP string) error
 	ResetPassword(ctx context.Context, rawToken, newPassword string) error
 }
@@ -92,7 +68,7 @@ func NewAuthService(
 }
 
 // Register creates a new user account with the "user" role.
-func (s *authService) Register(ctx context.Context, input RegisterInput) (*models.PublicUser, error) {
+func (s *authService) Register(ctx context.Context, input dto.RegisterRequest) (*dto.UserResponse, error) {
 	hash, err := password.Hash(input.Password)
 	if err != nil {
 		return nil, fmt.Errorf("hashing password: %w", err)
@@ -128,11 +104,12 @@ func (s *authService) Register(ctx context.Context, input RegisterInput) (*model
 	}
 
 	user.Roles = []string{models.RoleUser}
-	return user.ToPublic(), nil
+	ur := dto.ToUserResponse(user)
+	return &ur, nil
 }
 
 // Login verifies credentials and issues access + refresh tokens.
-func (s *authService) Login(ctx context.Context, input LoginInput, ip, userAgent string) (*AuthTokens, error) {
+func (s *authService) Login(ctx context.Context, input dto.LoginRequest, ip, userAgent string) (*dto.AuthTokensResponse, error) {
 	user, err := s.userRepo.FindByEmail(ctx, input.Email)
 	if errors.Is(err, repository.ErrNotFound) {
 		// Use constant-time comparison to avoid timing attacks.
@@ -158,13 +135,14 @@ func (s *authService) Login(ctx context.Context, input LoginInput, ip, userAgent
 
 	user.Roles = roles
 
-	return s.issueTokenPair(ctx, user.ID.String(), roles, ip, userAgent, user.ToPublic())
+	ur := dto.ToUserResponse(user)
+	return s.issueTokenPair(ctx, user.ID.String(), roles, ip, userAgent, &ur)
 }
 
 // RefreshTokens validates the refresh token, rotates it, and issues a new pair.
 // Rotation strategy: the old token is revoked and a new one is issued.
 // If a revoked token is presented (replay attack), we detect it via replaced_by_jti.
-func (s *authService) RefreshTokens(ctx context.Context, rawRefreshToken, ip, userAgent string) (*AuthTokens, error) {
+func (s *authService) RefreshTokens(ctx context.Context, rawRefreshToken, ip, userAgent string) (*dto.AuthTokensResponse, error) {
 	// 1. Validate JWT signature, expiry, iss, aud, typ=refresh.
 	claims, err := s.jwtMgr.ValidateRefreshToken(rawRefreshToken)
 	if err != nil {
@@ -255,7 +233,7 @@ func (s *authService) Logout(ctx context.Context, rawRefreshToken string) error 
 }
 
 // GetMe returns the public profile of the authenticated user.
-func (s *authService) GetMe(ctx context.Context, userID string) (*models.PublicUser, error) {
+func (s *authService) GetMe(ctx context.Context, userID string) (*dto.UserResponse, error) {
 	id, err := uuid.Parse(userID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid user id: %w", err)
@@ -272,11 +250,12 @@ func (s *authService) GetMe(ctx context.Context, userID string) (*models.PublicU
 		return nil, fmt.Errorf("getting roles: %w", err)
 	}
 	user.Roles = roles
-	return user.ToPublic(), nil
+	ur := dto.ToUserResponse(user)
+	return &ur, nil
 }
 
 // issueTokenPair creates and stores a new access + refresh token pair.
-func (s *authService) issueTokenPair(ctx context.Context, userID string, roles []string, ip, userAgent string, userProfile *models.PublicUser) (*AuthTokens, error) {
+func (s *authService) issueTokenPair(ctx context.Context, userID string, roles []string, ip, userAgent string, userProfile *dto.UserResponse) (*dto.AuthTokensResponse, error) {
 	accessToken, _, err := s.jwtMgr.IssueAccessToken(userID, roles)
 	if err != nil {
 		return nil, fmt.Errorf("issuing access token: %w", err)
@@ -307,7 +286,7 @@ func (s *authService) issueTokenPair(ctx context.Context, userID string, roles [
 	}
 
 	expiresAt := now.Add(s.accessTTL)
-	return &AuthTokens{
+	return &dto.AuthTokensResponse{
 		AccessToken:  accessToken,
 		RefreshToken: rawRefreshToken,
 		TokenType:    "Bearer",
@@ -406,9 +385,6 @@ func (s *authService) ResetPassword(ctx context.Context, rawToken, newPassword s
 	if err := s.passwordResetRepo.MarkAsUsed(ctx, prt.ID); err != nil {
 		return fmt.Errorf("marking token used: %w", err)
 	}
-
-	// For ultimate security, we could optionally call RevokeAllForUser to drop existing sessions
-	// s.tokenRepo.RevokeAllForUser(ctx, prt.UserID)
 
 	return nil
 }

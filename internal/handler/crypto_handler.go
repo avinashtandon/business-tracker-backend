@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/avinashtandon/business-tracker-backend/internal/dto"
+	"github.com/avinashtandon/business-tracker-backend/internal/middleware"
 	"github.com/avinashtandon/business-tracker-backend/internal/repository"
 	"github.com/avinashtandon/business-tracker-backend/internal/service"
 	"github.com/avinashtandon/business-tracker-backend/pkg/coingecko"
@@ -25,13 +27,9 @@ func NewCryptoHandler(cryptoSvc service.CryptoService) *CryptoHandler {
 
 // POST /api/v1/crypto
 func (h *CryptoHandler) CreateHolding(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
-	var input service.CreateHoldingInput
+	var input dto.CreateHoldingRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		response.ValidationError(w, "invalid JSON body")
 		return
@@ -41,39 +39,31 @@ func (h *CryptoHandler) CreateHolding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	holding, err := h.cryptoSvc.CreateHolding(r.Context(), userID, input)
+	holdingResp, err := h.cryptoSvc.CreateHolding(r.Context(), userID, input)
 	if err != nil {
 		response.Error(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 		return
 	}
 
-	response.Success(w, http.StatusCreated, holding)
+	response.Success(w, http.StatusCreated, holdingResp)
 }
 
 // GET /api/v1/crypto
 func (h *CryptoHandler) ListHoldings(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
-	holdings, err := h.cryptoSvc.ListHoldings(r.Context(), userID)
+	holdingsResp, err := h.cryptoSvc.ListHoldings(r.Context(), userID)
 	if err != nil {
 		response.InternalServerError(w)
 		return
 	}
 
-	response.Success(w, http.StatusOK, holdings)
+	response.Success(w, http.StatusOK, holdingsResp)
 }
 
 // DELETE /api/v1/crypto/:id
 func (h *CryptoHandler) DeleteHolding(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
 	holdingID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -96,11 +86,7 @@ func (h *CryptoHandler) DeleteHolding(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/crypto/:id/purchases
 func (h *CryptoHandler) CreatePurchase(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
 	holdingID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -108,7 +94,7 @@ func (h *CryptoHandler) CreatePurchase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var input service.CreatePurchaseInput
+	var input dto.CreatePurchaseRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		response.ValidationError(w, "invalid JSON body")
 		return
@@ -118,7 +104,7 @@ func (h *CryptoHandler) CreatePurchase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	purchase, err := h.cryptoSvc.CreatePurchase(r.Context(), userID, holdingID, input)
+	purchaseResp, err := h.cryptoSvc.CreatePurchase(r.Context(), userID, holdingID, input)
 	if errors.Is(err, repository.ErrNotFound) {
 		response.Error(w, http.StatusNotFound, "NOT_FOUND", "holding not found")
 		return
@@ -128,16 +114,12 @@ func (h *CryptoHandler) CreatePurchase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.Success(w, http.StatusCreated, purchase)
+	response.Success(w, http.StatusCreated, purchaseResp)
 }
 
 // DELETE /api/v1/crypto/:id/purchases/:pid
 func (h *CryptoHandler) DeletePurchase(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
 	holdingID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {

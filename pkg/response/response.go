@@ -10,6 +10,7 @@ import (
 type Envelope struct {
 	Success bool        `json:"success"`
 	Data    interface{} `json:"data,omitempty"`
+	Meta    interface{} `json:"meta,omitempty"`
 	Error   *APIError   `json:"error,omitempty"`
 }
 
@@ -29,6 +30,11 @@ func JSON(w http.ResponseWriter, status int, body interface{}) {
 // Success writes a successful JSON response.
 func Success(w http.ResponseWriter, status int, data interface{}) {
 	JSON(w, status, Envelope{Success: true, Data: data})
+}
+
+// SuccessWithMeta writes a successful JSON response with pagination metadata.
+func SuccessWithMeta(w http.ResponseWriter, status int, data interface{}, meta interface{}) {
+	JSON(w, status, Envelope{Success: true, Data: data, Meta: meta})
 }
 
 // Error writes an error JSON response with a machine-readable code.

@@ -18,45 +18,14 @@ const (
 
 // User represents a registered account in the system.
 type User struct {
-	ID           uuid.UUID  `db:"id"`
-	Email        string     `db:"email"`
-	Username     string     `db:"username"`
-	FirstName    string     `db:"first_name"`
-	LastName     string     `db:"last_name"`
-	PasswordHash string     `db:"password_hash"`
-	Status       UserStatus `db:"status"`
-	CreatedAt    time.Time  `db:"created_at"`
-	UpdatedAt    time.Time  `db:"updated_at"`
-	// Roles is populated by a JOIN query, not stored in users table.
-	Roles []string `db:"-"`
-}
-
-// PublicUser is the safe representation returned to clients (no password hash).
-type PublicUser struct {
-	ID        string     `json:"id"`
-	Email     string     `json:"email"`
-	FirstName string     `json:"first_name"`
-	LastName  string     `json:"last_name"`
-	Status    UserStatus `json:"status"`
-	Roles     []string   `json:"roles"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-}
-
-// ToPublic converts a User to its safe public representation.
-func (u *User) ToPublic() *PublicUser {
-	roles := u.Roles
-	if roles == nil {
-		roles = []string{}
-	}
-	return &PublicUser{
-		ID:        u.ID.String(),
-		Email:     u.Email,
-		FirstName: u.FirstName,
-		LastName:  u.LastName,
-		Status:    u.Status,
-		Roles:     roles,
-		CreatedAt: u.CreatedAt,
-		UpdatedAt: u.UpdatedAt,
-	}
+	ID           uuid.UUID
+	Email        string
+	Username     string
+	FirstName    string
+	LastName     string
+	PasswordHash string
+	Status       UserStatus
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Roles        []string
 }

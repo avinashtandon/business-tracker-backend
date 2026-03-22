@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/avinashtandon/business-tracker-backend/internal/dto"
 	"github.com/avinashtandon/business-tracker-backend/internal/middleware"
 	"github.com/avinashtandon/business-tracker-backend/internal/service"
 	"github.com/avinashtandon/business-tracker-backend/pkg/response"
@@ -28,7 +29,7 @@ func NewAuthHandler(authSvc service.AuthService) *AuthHandler {
 // Request:  {"email": "user@example.com", "password": "SecurePass123!"}
 // Response: {"success": true, "data": {"id": "...", "email": "...", "roles": ["user"], ...}}
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	var input service.RegisterInput
+	var input dto.RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		response.ValidationError(w, "invalid JSON body")
 		return
@@ -58,7 +59,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 // Request:  {"email": "user@example.com", "password": "SecurePass123!"}
 // Response: {"success": true, "data": {"access_token": "...", "refresh_token": "...", "expires_in": 900}}
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	var input service.LoginInput
+	var input dto.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		response.ValidationError(w, "invalid JSON body")
 		return
@@ -93,9 +94,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 // Request:  {"refresh_token": "eyJ..."}
 // Response: {"success": true, "data": {"access_token": "...", "refresh_token": "...", "expires_in": 900}}
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		RefreshToken string `json:"refresh_token" validate:"required"`
-	}
+	var body dto.RefreshRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		response.ValidationError(w, "invalid JSON body")
 		return
@@ -129,9 +128,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 // Request:  {"refresh_token": "eyJ..."}
 // Response: {"success": true, "data": {"message": "logged out successfully"}}
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		RefreshToken string `json:"refresh_token" validate:"required"`
-	}
+	var body dto.RefreshRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		response.ValidationError(w, "invalid JSON body")
 		return
@@ -181,9 +178,7 @@ func clientIP(r *http.Request) string {
 // ForgotPassword handles POST /api/v1/auth/forgot-password
 // Always returns a generic success message to prevent email enumeration.
 func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Email string `json:"email" validate:"required,email"`
-	}
+	var body dto.ForgotPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		response.ValidationError(w, "invalid JSON body")
 		return
@@ -208,10 +203,7 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 
 // ResetPassword handles POST /api/v1/auth/reset-password
 func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Token       string `json:"token" validate:"required"`
-		NewPassword string `json:"new_password" validate:"required,min=8,max=128"`
-	}
+	var body dto.ResetPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		response.ValidationError(w, "invalid JSON body")
 		return

@@ -8,6 +8,7 @@ import (
 
 	"github.com/avinashtandon/business-tracker-backend/pkg/jwtpkg"
 	"github.com/avinashtandon/business-tracker-backend/pkg/response"
+	"github.com/google/uuid"
 )
 
 type contextKey string
@@ -53,4 +54,20 @@ func Authenticate(jwtMgr *jwtpkg.Manager) func(http.Handler) http.Handler {
 func ClaimsFromContext(ctx context.Context) *jwtpkg.Claims {
 	claims, _ := ctx.Value(ClaimsKey).(*jwtpkg.Claims)
 	return claims
+}
+
+// MustUserID retrieves the parsed user UUID from the context's claims.
+// It will panic if the claims are missing or if the Subject isn't a valid UUID.
+// This is perfectly safe as long as it's ONLY called on routes protected by the Authenticate middleware!
+func MustUserID(ctx context.Context) uuid.UUID {
+	claims := ClaimsFromContext(ctx)
+	if claims == nil {
+		panic("MustUserID called without Authenticate middleware active")
+	}
+
+	id, err := uuid.Parse(claims.Subject)
+	if err != nil {
+		panic("invalid UUID inside JWT subject")
+	}
+	return id
 }

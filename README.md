@@ -17,6 +17,25 @@ A production-ready REST API implementing JWT authentication + RBAC with MySQL.
 
 ---
 
+## Core Architecture (Strict DTO Flow)
+
+The application rigidly follows a **Strict DTO** layer-segregation model enforcing a one-way flow of business constraints and data sanitization:
+
+1. **HTTP Handlers (`internal/handler`)**: 
+   - Receives JSON requests and explicitly bounds them to `Request DTO` structs (`internal/dto`).
+   - Handlers **never** touch Domain Models. They blindly forward JSON requests to the Service layer and blindly return the resulting `Response DTO` as JSON. 
+
+2. **Service Layer (`internal/service`)**:
+   - The "Brain" of the application.
+   - Accepts `Request DTOs`, maps them into **Pure Domain Models** (e.g., `models.Trade`), calculates business logic, and passes models to the Repository.
+   - Converts the finalized models into sanitized `Response DTOs` via `dto.ToResponse()` to guarantee sensitive keys (like `password_hash` or database metadata) never leak to the API.
+
+3. **Repository Layer (`internal/repository`)**:
+   - The "Vault". Converts pure `Domain Models` into tightly private database row structs (e.g., `tradeRow`).
+   - Contains 100% of all SQL execution and struct `db` tags. Database mapping structures explicitly cannot leave this package.
+
+---
+
 ## Quick Start (Docker)
 
 ### 1. Generate RSA Keys

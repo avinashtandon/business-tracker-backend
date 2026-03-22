@@ -4,7 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
+	"time"
 
+	"github.com/avinashtandon/business-tracker-backend/internal/dto"
+	"github.com/avinashtandon/business-tracker-backend/internal/middleware"
 	"github.com/avinashtandon/business-tracker-backend/internal/repository"
 	"github.com/avinashtandon/business-tracker-backend/internal/service"
 	"github.com/avinashtandon/business-tracker-backend/pkg/response"
@@ -22,13 +26,9 @@ func NewTradeHandler(tradeSvc service.TradeService) *TradeHandler {
 }
 
 func (h *TradeHandler) Create(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
-	var input service.CreateTradeInput
+	var input dto.CreateTradeRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		response.ValidationError(w, "invalid JSON body")
 		return
@@ -38,37 +38,55 @@ func (h *TradeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	trade, err := h.tradeSvc.CreateTrade(r.Context(), userID, input)
+	tradeResp, err := h.tradeSvc.CreateTrade(r.Context(), userID, input)
 	if err != nil {
 		response.Error(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 		return
 	}
 
-	response.Success(w, http.StatusCreated, trade)
+	response.Success(w, http.StatusCreated, tradeResp)
 }
 
 func (h *TradeHandler) List(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
+	userID := middleware.MustUserID(r.Context())
+
+	limitStr := r.URL.Query().Get("limit")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 20
 	}
 
-	trades, err := h.tradeSvc.ListTrades(r.Context(), userID)
+	cursorStr := r.URL.Query().Get("cursor")
+	var cursor *time.Time
+	if cursorStr != "" {
+		cursorTime, err := time.Parse(time.RFC3339Nano, cursorStr)
+		if err == nil {
+			cursor = &cursorTime
+		}
+	}
+
+	trades, hasMore, err := h.tradeSvc.ListTrades(r.Context(), userID, cursor, limit)
 	if err != nil {
 		response.InternalServerError(w)
 		return
 	}
 
-	response.Success(w, http.StatusOK, trades)
+	var nextCursor *string
+	if hasMore && len(trades) > 0 {
+		c := trades[len(trades)-1].CreatedAt
+		nextCursor = &c
+	}
+
+	meta := map[string]interface{}{
+		"next_cursor": nextCursor,
+		"has_more":    hasMore,
+	}
+
+	response.SuccessWithMeta(w, http.StatusOK, trades, meta)
 }
 
 func (h *TradeHandler) Update(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
 	tradeID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -76,7 +94,7 @@ func (h *TradeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var input service.CreateTradeInput
+	var input dto.CreateTradeRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		response.ValidationError(w, "invalid JSON body")
 		return
@@ -100,11 +118,7 @@ func (h *TradeHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TradeHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
 	tradeID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {

@@ -15,7 +15,7 @@ import (
 type TradeRepository interface {
 	CreateTrade(ctx context.Context, trade *models.Trade) error
 	GetTradeByID(ctx context.Context, tradeID uuid.UUID, userID uuid.UUID) (*models.Trade, error)
-	ListTradesByUser(ctx context.Context, userID uuid.UUID) ([]*models.Trade, error)
+	ListTradesByUser(ctx context.Context, userID uuid.UUID, cursor *time.Time, limit int) ([]*models.Trade, bool, error)
 	UpdateTrade(ctx context.Context, trade *models.Trade) error
 	DeleteTrade(ctx context.Context, tradeID uuid.UUID, userID uuid.UUID) error
 }
@@ -29,19 +29,19 @@ func NewTradeRepository(db *sqlx.DB) TradeRepository {
 }
 
 type tradeRow struct {
-	ID           []byte          `db:"id"`
-	UserID       []byte          `db:"user_id"`
-	Name         string          `db:"name"`
-	Type         string          `db:"type"`
-	Position     string          `db:"position"`
-	Quantity     float64         `db:"quantity"`
-	BuyingPrice  float64         `db:"buying_price"`
-	BuyingDate   time.Time       `db:"buying_date"`
-	SellingPrice sql.NullFloat64 `db:"selling_price"`
-	SellingDate  sql.NullTime    `db:"selling_date"`
-	Status       string          `db:"status"`
-	CreatedAt    time.Time       `db:"created_at"`
-	UpdatedAt    time.Time       `db:"updated_at"`
+	ID           []byte        `db:"id"`
+	UserID       []byte        `db:"user_id"`
+	Name         string        `db:"name"`
+	Type         string        `db:"type"`
+	Position     string        `db:"position"`
+	Quantity     float64       `db:"quantity"`
+	BuyingPrice  *int64        `db:"buying_price"`
+	BuyingDate   *time.Time    `db:"buying_date"`
+	SellingPrice *int64        `db:"selling_price"`
+	SellingDate  *time.Time    `db:"selling_date"`
+	Status       string        `db:"status"`
+	CreatedAt    time.Time     `db:"created_at"`
+	UpdatedAt    time.Time     `db:"updated_at"`
 }
 
 func (r tradeRow) toModel() (*models.Trade, error) {
@@ -55,44 +55,29 @@ func (r tradeRow) toModel() (*models.Trade, error) {
 	}
 
 	trade := &models.Trade{
-		ID:          id,
-		UserID:      userID,
-		Name:        r.Name,
-		Type:        r.Type,
-		Position:    r.Position,
-		Quantity:    r.Quantity,
-		BuyingPrice: r.BuyingPrice,
-		BuyingDate:  r.BuyingDate.Format("2006-01-02"),
-		Status:      r.Status,
-		CreatedAt:   r.CreatedAt,
-		UpdatedAt:   r.UpdatedAt,
-	}
-
-	if r.SellingPrice.Valid {
-		trade.SellingPrice = &r.SellingPrice.Float64
-	}
-	if r.SellingDate.Valid {
-		sd := r.SellingDate.Time.Format("2006-01-02")
-		trade.SellingDate = &sd
+		ID:           id,
+		UserID:       userID,
+		Name:         r.Name,
+		Type:         models.TradeType(r.Type),
+		Position:     models.PositionType(r.Position),
+		Quantity:     r.Quantity,
+		BuyingPrice:  r.BuyingPrice,
+		BuyingDate:   r.BuyingDate,
+		SellingPrice: r.SellingPrice,
+		SellingDate:  r.SellingDate,
+		Status:       models.TradeStatus(r.Status),
+		CreatedAt:    r.CreatedAt,
+		UpdatedAt:    r.UpdatedAt,
 	}
 
 	return trade, nil
 }
 
 func (r *tradeRepo) CreateTrade(ctx context.Context, trade *models.Trade) error {
-	var sp sql.NullFloat64
-	if trade.SellingPrice != nil {
-		sp = sql.NullFloat64{Float64: *trade.SellingPrice, Valid: true}
-	}
-	var sd sql.NullString
-	if trade.SellingDate != nil {
-		sd = sql.NullString{String: *trade.SellingDate, Valid: true}
-	}
-
 	_, err := r.db.ExecContext(ctx,
 		`INSERT INTO trades (id, user_id, name, type, position, quantity, buying_price, buying_date, selling_price, selling_date, status, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		trade.ID[:], trade.UserID[:], trade.Name, trade.Type, trade.Position, trade.Quantity, trade.BuyingPrice, trade.BuyingDate, sp, sd, trade.Status, trade.CreatedAt, trade.UpdatedAt,
+		trade.ID[:], trade.UserID[:], trade.Name, string(trade.Type), string(trade.Position), trade.Quantity, trade.BuyingPrice, trade.BuyingDate, trade.SellingPrice, trade.SellingDate, string(trade.Status), trade.CreatedAt, trade.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("inserting trade: %w", err)
@@ -113,43 +98,50 @@ func (r *tradeRepo) GetTradeByID(ctx context.Context, tradeID uuid.UUID, userID 
 	return row.toModel()
 }
 
-func (r *tradeRepo) ListTradesByUser(ctx context.Context, userID uuid.UUID) ([]*models.Trade, error) {
+func (r *tradeRepo) ListTradesByUser(ctx context.Context, userID uuid.UUID, cursor *time.Time, limit int) ([]*models.Trade, bool, error) {
 	var rows []tradeRow
-	err := r.db.SelectContext(ctx, &rows, `SELECT * FROM trades WHERE user_id = ? ORDER BY created_at DESC`, userID[:])
+	var err error
+
+	// We fetch one extra row (limit + 1) to determine if there are more records (hasMore).
+	fetchLimit := limit + 1
+
+	if cursor == nil {
+		err = r.db.SelectContext(ctx, &rows, `SELECT * FROM trades WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`, userID[:], fetchLimit)
+	} else {
+		err = r.db.SelectContext(ctx, &rows, `SELECT * FROM trades WHERE user_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT ?`, userID[:], *cursor, fetchLimit)
+	}
+
 	if err != nil {
-		return nil, fmt.Errorf("listing trades: %w", err)
+		return nil, false, fmt.Errorf("listing trades: %w", err)
+	}
+
+	hasMore := false
+	if len(rows) > limit {
+		hasMore = true
+		rows = rows[:limit] // Trim to actual requested limit
 	}
 
 	if len(rows) == 0 {
-		return []*models.Trade{}, nil
+		return []*models.Trade{}, false, nil
 	}
 
 	trades := make([]*models.Trade, 0, len(rows))
 	for _, row := range rows {
 		trade, err := row.toModel()
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		trades = append(trades, trade)
 	}
 
-	return trades, nil
+	return trades, hasMore, nil
 }
 
 func (r *tradeRepo) UpdateTrade(ctx context.Context, trade *models.Trade) error {
-	var sp sql.NullFloat64
-	if trade.SellingPrice != nil {
-		sp = sql.NullFloat64{Float64: *trade.SellingPrice, Valid: true}
-	}
-	var sd sql.NullString
-	if trade.SellingDate != nil {
-		sd = sql.NullString{String: *trade.SellingDate, Valid: true}
-	}
-
 	res, err := r.db.ExecContext(ctx,
 		`UPDATE trades SET name = ?, type = ?, position = ?, quantity = ?, buying_price = ?, buying_date = ?, selling_price = ?, selling_date = ?, status = ?, updated_at = ?
 		WHERE id = ? AND user_id = ?`,
-		trade.Name, trade.Type, trade.Position, trade.Quantity, trade.BuyingPrice, trade.BuyingDate, sp, sd, trade.Status, trade.UpdatedAt,
+		trade.Name, string(trade.Type), string(trade.Position), trade.Quantity, trade.BuyingPrice, trade.BuyingDate, trade.SellingPrice, trade.SellingDate, string(trade.Status), trade.UpdatedAt,
 		trade.ID[:], trade.UserID[:],
 	)
 	if err != nil {
@@ -175,3 +167,4 @@ func (r *tradeRepo) DeleteTrade(ctx context.Context, tradeID uuid.UUID, userID u
 	}
 	return nil
 }
+

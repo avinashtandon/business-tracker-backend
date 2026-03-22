@@ -22,14 +22,14 @@ func NewAdminHandler(userSvc service.UserService) *AdminHandler {
 //
 // Response: {"success": true, "data": {"users": [...], "total": N}}
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := h.userSvc.ListUsers(r.Context())
+	usersResp, err := h.userSvc.ListUsers(r.Context())
 	if err != nil {
 		response.InternalServerError(w)
 		return
 	}
 
 	response.Success(w, http.StatusOK, map[string]interface{}{
-		"users": users,
-		"total": len(users),
+		"users": usersResp,
+		"total": len(usersResp),
 	})
 }

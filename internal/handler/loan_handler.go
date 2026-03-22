@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/avinashtandon/business-tracker-backend/internal/dto"
 	"github.com/avinashtandon/business-tracker-backend/internal/middleware"
 	"github.com/avinashtandon/business-tracker-backend/internal/repository"
 	"github.com/avinashtandon/business-tracker-backend/internal/service"
@@ -22,22 +23,10 @@ func NewLoanHandler(loanSvc service.LoanService) *LoanHandler {
 	return &LoanHandler{loanSvc: loanSvc}
 }
 
-func getUserID(r *http.Request) (uuid.UUID, error) {
-	claims := middleware.ClaimsFromContext(r.Context())
-	if claims == nil {
-		return uuid.Nil, errors.New("unauthorized")
-	}
-	return uuid.Parse(claims.Subject)
-}
-
 func (h *LoanHandler) Create(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
-	var input service.CreateLoanInput
+	var input dto.CreateLoanRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		response.ValidationError(w, "invalid JSON body")
 		return
@@ -47,37 +36,29 @@ func (h *LoanHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loan, err := h.loanSvc.CreateLoan(r.Context(), userID, input)
+	loanResp, err := h.loanSvc.CreateLoan(r.Context(), userID, input)
 	if err != nil {
 		response.Error(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 		return
 	}
 
-	response.Success(w, http.StatusCreated, loan)
+	response.Success(w, http.StatusCreated, loanResp)
 }
 
 func (h *LoanHandler) List(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
-	loans, err := h.loanSvc.ListLoans(r.Context(), userID)
+	loansResp, err := h.loanSvc.ListLoans(r.Context(), userID)
 	if err != nil {
 		response.InternalServerError(w)
 		return
 	}
 
-	response.Success(w, http.StatusOK, loans)
+	response.Success(w, http.StatusOK, loansResp)
 }
 
 func (h *LoanHandler) Get(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
 	loanID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -85,7 +66,7 @@ func (h *LoanHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loan, err := h.loanSvc.GetLoan(r.Context(), userID, loanID)
+	loanResp, err := h.loanSvc.GetLoan(r.Context(), userID, loanID)
 	if errors.Is(err, repository.ErrNotFound) {
 		response.Error(w, http.StatusNotFound, "NOT_FOUND", "loan not found")
 		return
@@ -94,15 +75,11 @@ func (h *LoanHandler) Get(w http.ResponseWriter, r *http.Request) {
 		response.InternalServerError(w)
 		return
 	}
-	response.Success(w, http.StatusOK, loan)
+	response.Success(w, http.StatusOK, loanResp)
 }
 
 func (h *LoanHandler) Update(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
 	loanID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -110,7 +87,7 @@ func (h *LoanHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var input service.CreateLoanInput
+	var input dto.CreateLoanRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		response.ValidationError(w, "invalid JSON body")
 		return
@@ -134,11 +111,7 @@ func (h *LoanHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LoanHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
 	loanID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -160,11 +133,7 @@ func (h *LoanHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LoanHandler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
 	loanID, err := uuid.Parse(chi.URLParam(r, "loan_id"))
 	if err != nil {
@@ -172,7 +141,7 @@ func (h *LoanHandler) CreateTransaction(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var input service.CreateTransactionInput
+	var input dto.CreateTransactionRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		response.ValidationError(w, "invalid JSON body")
 		return
@@ -182,7 +151,7 @@ func (h *LoanHandler) CreateTransaction(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	tx, err := h.loanSvc.CreateTransaction(r.Context(), userID, loanID, input)
+	txResp, err := h.loanSvc.CreateTransaction(r.Context(), userID, loanID, input)
 	if errors.Is(err, repository.ErrNotFound) {
 		response.Error(w, http.StatusNotFound, "NOT_FOUND", "loan not found")
 		return
@@ -192,15 +161,11 @@ func (h *LoanHandler) CreateTransaction(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	response.Success(w, http.StatusCreated, tx)
+	response.Success(w, http.StatusCreated, txResp)
 }
 
 func (h *LoanHandler) DeleteTransaction(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserID(r)
-	if err != nil {
-		response.Unauthorized(w, err.Error())
-		return
-	}
+	userID := middleware.MustUserID(r.Context())
 
 	loanID, err := uuid.Parse(chi.URLParam(r, "loan_id"))
 	if err != nil {
